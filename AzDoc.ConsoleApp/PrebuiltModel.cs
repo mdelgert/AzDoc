@@ -1,4 +1,7 @@
-﻿using Azure;
+﻿/*
+https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/quickstarts/get-started-sdks-rest-api?view=doc-intel-4.0.0&pivots=programming-language-csharp
+
+using Azure;
 using Azure.AI.DocumentIntelligence;
 using Microsoft.Extensions.Configuration;
 
@@ -104,3 +107,4 @@ for (int i = 0; i < result.Documents.Count; i++)
         Console.WriteLine($"Invoice Total: '{invoiceTotal.CurrencySymbol}{invoiceTotal.Amount}', with confidence {invoiceTotalField.Confidence}");
     }
 }
+*/
