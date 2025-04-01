@@ -1,4 +1,5 @@
-﻿using Azure;
+﻿
+using Azure;
 using Azure.AI.DocumentIntelligence;
 using Microsoft.Extensions.Configuration;
 
@@ -19,88 +20,128 @@ if (string.IsNullOrEmpty(endpoint) || string.IsNullOrEmpty(key))
     throw new InvalidOperationException("Azure Document Intelligence configuration is missing. Ensure 'Endpoint' and 'Key' are specified in 'AzureDocumentIntelligence' section of appsettings.json.");
 }
 
+// Initialize the Azure Document Intelligence client
 AzureKeyCredential credential = new AzureKeyCredential(key);
 DocumentIntelligenceClient client = new DocumentIntelligenceClient(new Uri(endpoint), credential);
 
-//sample invoice document
-
-Uri invoiceUri = new Uri("https://raw.githubusercontent.com/Azure-Samples/cognitive-services-REST-api-samples/master/curl/form-recognizer/sample-invoice.pdf");
+/*
+// Sample document URL
+Uri fileUri = new Uri("https://raw.githubusercontent.com/Azure-Samples/cognitive-services-REST-api-samples/master/curl/form-recognizer/sample-layout.pdf");
 
 AnalyzeDocumentContent content = new AnalyzeDocumentContent()
 {
-    UrlSource = invoiceUri
+    UrlSource = fileUri
+};
+*/
+
+// Specify the path to your local file
+//string localFilePath = "sample-layout.pdf"; // Replace with your actual file path
+string localFilePath = "C:\\temp\\test.pdf"; // Replace with your actual file path
+
+// Read and validate the local file
+byte[] fileBytes;
+try
+{
+    fileBytes = File.ReadAllBytes(localFilePath);
+    if (fileBytes.Length == 0)
+    {
+        throw new InvalidOperationException($"The file at '{localFilePath}' is empty.");
+    }
+    Console.WriteLine($"File size: {fileBytes.Length} bytes"); // Debug info
+}
+catch (FileNotFoundException)
+{
+    throw new FileNotFoundException($"The file at '{localFilePath}' was not found.");
+}
+catch (IOException ex)
+{
+    throw new IOException($"Error reading the file at '{localFilePath}': {ex.Message}");
+}
+
+// Convert to Base64 and create content
+string base64File = Convert.ToBase64String(fileBytes);
+AnalyzeDocumentContent content = new AnalyzeDocumentContent()
+{
+    Base64Source = BinaryData.FromBytes(fileBytes) // Use raw bytes instead of Base64 string
 };
 
-Operation<AnalyzeResult> operation = await client.AnalyzeDocumentAsync(WaitUntil.Completed, "prebuilt-invoice", content);
-
+// Analyze the document
+Operation<AnalyzeResult> operation = await client.AnalyzeDocumentAsync(WaitUntil.Completed, "prebuilt-layout", content);
 AnalyzeResult result = operation.Value;
 
-for (int i = 0; i < result.Documents.Count; i++)
+// Process the result
+foreach (DocumentPage page in result.Pages)
 {
-    Console.WriteLine($"Document {i}:");
+    Console.WriteLine($"Document Page {page.PageNumber} has {page.Lines.Count} line(s), {page.Words.Count} word(s)," +
+        $" and {page.SelectionMarks.Count} selection mark(s).");
 
-    AnalyzedDocument document = result.Documents[i];
-
-    if (document.Fields.TryGetValue("VendorName", out DocumentField vendorNameField)
-        && vendorNameField.Type == DocumentFieldType.String)
+    for (int i = 0; i < page.Lines.Count; i++)
     {
-        string vendorName = vendorNameField.ValueString;
-        Console.WriteLine($"Vendor Name: '{vendorName}', with confidence {vendorNameField.Confidence}");
-    }
-
-    if (document.Fields.TryGetValue("CustomerName", out DocumentField customerNameField)
-        && customerNameField.Type == DocumentFieldType.String)
-    {
-        string customerName = customerNameField.ValueString;
-        Console.WriteLine($"Customer Name: '{customerName}', with confidence {customerNameField.Confidence}");
-    }
-
-    if (document.Fields.TryGetValue("Items", out DocumentField itemsField)
-        && itemsField.Type == DocumentFieldType.List)
-    {
-        foreach (DocumentField itemField in itemsField.ValueList)
+        DocumentLine line = page.Lines[i];
+        Console.WriteLine($"  Line {i}:");
+        Console.WriteLine($"    Content: '{line.Content}'");
+        Console.Write("    Bounding polygon, with points ordered clockwise:");
+        for (int j = 0; j < line.Polygon.Count; j += 2)
         {
-            Console.WriteLine("Item:");
+            Console.Write($" ({line.Polygon[j]}, {line.Polygon[j + 1]})");
+        }
+        Console.WriteLine();
+    }
 
-            if (itemField.Type == DocumentFieldType.Dictionary)
-            {
-                IReadOnlyDictionary<string, DocumentField> itemFields = itemField.ValueDictionary;
+    for (int i = 0; i < page.SelectionMarks.Count; i++)
+    {
+        DocumentSelectionMark selectionMark = page.SelectionMarks[i];
+        Console.WriteLine($"  Selection Mark {i} is {selectionMark.State}.");
+        Console.WriteLine($"    State: {selectionMark.State}");
+        Console.Write("    Bounding polygon, with points ordered clockwise:");
 
-                if (itemFields.TryGetValue("Description", out DocumentField itemDescriptionField)
-                    && itemDescriptionField.Type == DocumentFieldType.String)
-                {
-                    string itemDescription = itemDescriptionField.ValueString;
-                    Console.WriteLine($"  Description: '{itemDescription}', with confidence {itemDescriptionField.Confidence}");
-                }
+        //Original code throws error
+        //for (int j = 0; j < selectionMark.Polygon.Count; j++)
+        //{
+        //    Console.Write($" ({selectionMark.Polygon[j]}, {selectionMark.Polygon[j + 1]})");
+        //}
 
-                if (itemFields.TryGetValue("Amount", out DocumentField itemAmountField)
-                    && itemAmountField.Type == DocumentFieldType.Currency)
-                {
-                    CurrencyValue itemAmount = itemAmountField.ValueCurrency;
-                    Console.WriteLine($"  Amount: '{itemAmount.CurrencySymbol}{itemAmount.Amount}', with confidence {itemAmountField.Confidence}");
-                }
-            }
+        for (int j = 0; j < selectionMark.Polygon.Count - 1; j += 2)
+        {
+            Console.Write($" ({selectionMark.Polygon[j]}, {selectionMark.Polygon[j + 1]})");
+        }
+
+
+        Console.WriteLine();
+    }
+}
+
+for (int i = 0; i < result.Paragraphs.Count; i++)
+{
+    DocumentParagraph paragraph = result.Paragraphs[i];
+    Console.WriteLine($"Paragraph {i}:");
+    Console.WriteLine($"  Content: {paragraph.Content}");
+    if (paragraph.Role != null)
+    {
+        Console.WriteLine($"  Role: {paragraph.Role}");
+    }
+}
+
+foreach (DocumentStyle style in result.Styles)
+{
+    bool isHandwritten = style.IsHandwritten.HasValue && style.IsHandwritten == true;
+    if (isHandwritten && style.Confidence > 0.8)
+    {
+        Console.WriteLine($"Handwritten content found:");
+        foreach (DocumentSpan span in style.Spans)
+        {
+            var handwrittenContent = result.Content.Substring(span.Offset, span.Length);
+            Console.WriteLine($"  {handwrittenContent}");
         }
     }
+}
 
-    if (document.Fields.TryGetValue("SubTotal", out DocumentField subTotalField)
-        && subTotalField.Type == DocumentFieldType.Currency)
+for (int i = 0; i < result.Tables.Count; i++)
+{
+    DocumentTable table = result.Tables[i];
+    Console.WriteLine($"Table {i} has {table.RowCount} rows and {table.ColumnCount} columns.");
+    foreach (DocumentTableCell cell in table.Cells)
     {
-        CurrencyValue subTotal = subTotalField.ValueCurrency;
-        Console.WriteLine($"Sub Total: '{subTotal.CurrencySymbol}{subTotal.Amount}', with confidence {subTotalField.Confidence}");
-    }
-
-    if (document.Fields.TryGetValue("TotalTax", out DocumentField totalTaxField)
-        && totalTaxField.Type == DocumentFieldType.Currency)
-    {
-        CurrencyValue totalTax = totalTaxField.ValueCurrency;
-        Console.WriteLine($"Total Tax: '{totalTax.CurrencySymbol}{totalTax.Amount}', with confidence {totalTaxField.Confidence}");
-    }
-
-    if (document.Fields.TryGetValue("InvoiceTotal", out DocumentField invoiceTotalField)
-        && invoiceTotalField.Type == DocumentFieldType.Currency)
-    {
-        CurrencyValue invoiceTotal = invoiceTotalField.ValueCurrency;
-        Console.WriteLine($"Invoice Total: '{invoiceTotal.CurrencySymbol}{invoiceTotal.Amount}', with confidence {invoiceTotalField.Confidence}");
+        Console.WriteLine($"  Cell ({cell.RowIndex}, {cell.ColumnIndex}) is a '{cell.Kind}' with content: {cell.Content}");
     }
 }
