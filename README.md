@@ -20,11 +20,12 @@ AzDoc is a .NET-based application designed to interact with Azure's Document Int
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/your-username/azdoc.git
+   git clone https://github.com/mdelgert/azdoc.git
    cd azdoc
    ```
 
-https://github.com/Azure/azure-sdk-for-net/blob/main/sdk/documentintelligence/Azure.AI.DocumentIntelligence/samples/README.md
+### Additional Resources
 
-https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/quickstarts/get-started-sdks-rest-api?view=doc-intel-4.0.0&pivots=programming-language-csharp
+- [Azure Document Intelligence SDK Samples](https://github.com/Azure/azure-sdk-for-net/blob/main/sdk/documentintelligence/Azure.AI.DocumentIntelligence/samples/README.md)
+- [Azure Document Intelligence Quickstart](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/quickstarts/get-started-sdks-rest-api?view=doc-intel-4.0.0&pivots=programming-language-csharp)
 
